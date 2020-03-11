@@ -76,4 +76,7 @@ workflows:
     jobs:
       - cntk-image-recon
       - named-entity-recognition
-      - testing
+      - testing:
+            requires:
+                - cntk-image-recon
+                - named-entity-recognition
