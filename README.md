@@ -1,3 +1,7 @@
+![singnetlogo](docs/assets/singnet-logo.jpg 'SingularityNET')
+
+[![CircleCI](https://circleci.com/gh/singnet/snet-ci-tools.svg?style=svg)](https://circleci.com/gh/singnet/dnn-model-services)
+
 # snet-ci-tools
 Some tools that are used in the CI/CD of the SingularityNET's services.
 
