@@ -190,7 +190,7 @@ commands:
                         $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${MAINNET_PORT}:${MAINNET_PORT}" || echo "") \
                         $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${TESTNET_PORT}:${TESTNET_PORT}" || echo "") \
                         << parameters.docker-volumes >> \
-                        -tdi ${DOCKER_IMAGE}:${GIT_USER} \
+                        -tdi ${DOCKER_IMAGE}:${CIRCLE_PROJECT_USERNAME} \
                         bash -c "git fetch;git checkout ${GIT_BRANCH};git pull;sh buildproto.sh;${SERVICE_RUN_COMMAND}"
                       EOF
 
