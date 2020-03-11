@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-    ssh-deployment: singularitynet/ssh-deployment@2.0.0
+    ssh-deployment: singularitynet/ssh-deployment@2.1.0
 
 jobs:
   cntk-image-recon:
@@ -19,7 +19,6 @@ jobs:
           mainnet-port: "9991"
           testnet-port: "9992"
           run-command: "source '/cntk/activate-cntk';python3 run_image_recon_service.py --ssl"
-          test-command: "sleep 20;source '/cntk/activate-cntk';python3 test_image_recon_service.py auto"
           docker-test-files: "Dockerfile, requirements.txt"
           docker-file-path: "services/cntk-image-recon/Dockerfile"
           docker-no-cache: true
@@ -30,6 +29,7 @@ jobs:
           infura-api-key: ${INFURA_API_KEY}
           daemon-version: ${CI_SNETD_VERSION}
           daemon-pk: ${PK_CNTK_IMAGE_RECON}
+
   named-entity-recognition:
     docker:
       - image: circleci/python:3.6.6-node
@@ -45,7 +45,6 @@ jobs:
           mainnet-port: "9993"
           testnet-port: "9994"
           run-command: "python3 run_service.py --ssl --metering"
-          test-command: "sleep 20;cd tests;pytest"
           docker-test-files: "Dockerfile, requirements.txt"
           docker-file-path: "named-entity-recognition/Dockerfile"
           docker-no-cache: true
@@ -57,8 +56,24 @@ jobs:
           daemon-version: ${CI_SNETD_VERSION}
           daemon-pk: ${PK_NAMED_ENTITY_RECOGNITION}
 
+  testing:
+    docker:
+      - image: circleci/python:3.6.6-node
+    steps:
+      - ssh-deployment/test:
+          ssh-host: ${SSH_HOST}
+          ssh-user: ${SSH_USER}
+          test-command: "sleep 20;source '/cntk/activate-cntk';python3 test_image_recon_service.py auto"
+          docker-container: "CI_TOOLS_IMAGE_RECON"
+      - ssh-deployment/test:
+          ssh-host: ${SSH_HOST}
+          ssh-user: ${SSH_USER}
+          test-command: "sleep 20;cd tests;pytest"
+          docker-container: "CI_TOOLS_NAMED_ENTITY_RECON"
+
 workflows:
   deploy-services:
     jobs:
       - cntk-image-recon
       - named-entity-recognition
+      - testing

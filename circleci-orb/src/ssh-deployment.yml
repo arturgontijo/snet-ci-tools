@@ -28,8 +28,6 @@ commands:
                 default: ""
             run-command:
                 type: string
-            test-command:
-                type: string
             docker-test-files:
                 type: string
                 default: ""
@@ -218,6 +216,19 @@ commands:
                         echo "Not updating..."
                       fi
 
+    test:
+        description: |
+            Testing...
+        parameters:
+            ssh-user:
+                type: string
+            ssh-host:
+                type: string
+            test-command:
+                type: string
+            docker-container:
+                type: string
+        steps:
             - run:
                 name: Testing local
                 no_output_timeout: 60m
@@ -233,7 +244,7 @@ commands:
                     EOF
 
 description: |
-    Orb to build and deploy a Docker container on a remote server using SSH.
+    Orb to remotly build, deploy and test a SingularityNET service on a Docker container sing SSH.
 display:
     home_url: https://github.com/singnet
     source_url: https://github.com/singnet/snet-ci-tools
@@ -243,7 +254,7 @@ examples:
             Example of using the orb.
         usage:
             orbs:
-                ssh-deployment: singularitynet/ssh-deployment@2.0.0
+                ssh-deployment: singularitynet/ssh-deployment@2.1.0
             version: 2.1
             workflows:
                 deploy_application:
@@ -256,15 +267,19 @@ examples:
                               git-branch: "master"
                               mainnet-port: "7000"
                               run-command: "python3 run_example_service.py"
-                              test-command: "python3 test_example_service.py"
                               docker-test-files: "Dockerfile, requirements.txt"
                               docker-file-path: "Dockerfile"
                               docker-image: "EXAMPLE_IMAGE_NAME"
                               docker-container: "EXAMPLE_CONTAINER_NAME"
+                        - ssh-deployment/test:
+                              ssh-host: "localhost"
+                              ssh-user: "ubuntu"
+                              test-command: "python3 test_example_service.py"
+                              docker-container: "EXAMPLE_CONTAINER_NAME"
 
 jobs:
     deploy:
-        description: Deploy a Docker image from a Github repository on a remote server using SSH.
+        description: Orb to remotly build, deploy and test a SingularityNET service on a Docker container sing SSH.
         docker:
             - image: circleci/python:3.6.6-node
         parameters:
@@ -299,9 +314,6 @@ jobs:
                 default: ""
             run-command:
                 description: The service run command.
-                type: string
-            test-command:
-                description: The service test command.
                 type: string
             docker-test-files:
                 description: The path(s) of files that will be tested before build the Docker image.
@@ -352,7 +364,6 @@ jobs:
                   mainnet-port: << parameters.mainnet-port >>
                   testnet-port: << parameters.testnet-port >>
                   run-command: << parameters.run-command >>
-                  test-command: << parameters.test-command >>
                   docker-test-files: << parameters.docker-test-files >>
                   docker-file-path: << parameters.docker-file-path >>
                   docker-no-cache: << parameters.docker-no-cache >>
@@ -363,3 +374,27 @@ jobs:
                   infura-api-key: << parameters.infura-api-key >>
                   daemon-version: << parameters.daemon-version >>
                   daemon-pk: << parameters.daemon-pk >>
+    test:
+        description: Orb to remotly build, deploy and test a SingularityNET service on a Docker container sing SSH.
+        docker:
+            - image: circleci/python:3.6.6-node
+        parameters:
+            ssh-user:
+                description: The remote SSH username.
+                type: string
+            ssh-host:
+                description: The remote SSH host.
+                type: string
+            test-command:
+                description: The service test command.
+                type: string
+            docker-container:
+                description: The name of the Docker container that will be started.
+                type: string
+        steps:
+            - checkout
+            - test:
+                  ssh-user: << parameters.ssh-user >>
+                  ssh-host: << parameters.ssh-host >>
+                  test-command: << parameters.test-command >>
+                  docker-container: << parameters.docker-container >>
