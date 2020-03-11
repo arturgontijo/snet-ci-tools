@@ -8,11 +8,13 @@ if [ "${SNETD_VERSION}" != "" ]; then
 						|| echo "")
 	if [ "${SNETD_CURR_VERSION}" = "" ] || [ "${SNETD_VERSION}" != "${SNETD_CURR_VERSION}" ]; then
 		ssh -o "StrictHostKeyChecking no" "${SSH_USER}"@"${SSH_HOST}" <<- EOF
-			cd /tmp || true
+			mkdir -p /tmp/"${PROD_TAG}""${DOCKER_CONTAINER}"
+			cd /tmp/"${PROD_TAG}""${DOCKER_CONTAINER}" || true
 			wget https://github.com/singnet/snet-daemon/releases/download/"${SNETD_VERSION}"/snet-daemon-"${SNETD_VERSION}"-linux-amd64.tar.gz
 			tar -zxvf snet-daemon-"${SNETD_VERSION}"-linux-amd64.tar.gz
 			docker cp snet-daemon-"${SNETD_VERSION}"-linux-amd64/snetd "${PROD_TAG}""${DOCKER_CONTAINER}":/usr/bin || echo true
-			rm -rf snet-daemon-*
+			cd ..
+			rm -rf /tmp/"${PROD_TAG}""${DOCKER_CONTAINER}"
 		EOF
 	fi
 fi
