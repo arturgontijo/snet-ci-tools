@@ -1,0 +1,64 @@
+version: 2.1
+
+orbs:
+    ssh-deployment: singularitynet/ssh-deployment@1.2.1
+
+jobs:
+  cntk-image-recon:
+    docker:
+      - image: circleci/python:3.6.6-node
+    steps:
+      - checkout
+      - ssh-deployment/deploy:
+          ssh-host: ${SSH_HOST}
+          ssh-user: ${SSH_USER}
+          git-user: "singnet"
+          git-repo: "dnn-model-services"
+          git-branch: "master"
+          service-dir: "services/cntk-image-recon"
+          mainnet-port: "9991"
+          testnet-port: "9992"
+          run-command: "source '/cntk/activate-cntk';python3 run_image_recon_service.py --ssl"
+          test-command: "sleep 20;source '/cntk/activate-cntk';python3 test_image_recon_service.py auto"
+          docker-test-files: "Dockerfile, requirements.txt"
+          docker-file-path: "services/cntk-image-recon/Dockerfile"
+          docker-no-cache: true
+          docker-image: "ci_tools_image_recon"
+          docker-container: "CI_TOOLS_IMAGE_RECON"
+          docker-nvidia: true
+          docker-volumes: "-v ~/singnet/.certs:/opt/singnet/.certs"
+          infura-api-key: ${INFURA_API_KEY}
+          daemon-version: ${CI_SNETD_VERSION}
+          daemon-pk: ${PK_CNTK_IMAGE_RECON}
+  named-entity-recognition:
+    docker:
+      - image: circleci/python:3.6.6-node
+    steps:
+      - checkout
+      - ssh-deployment/deploy:
+          ssh-host: ${SSH_HOST}
+          ssh-user: ${SSH_USER}
+          git-user: "singnet"
+          git-repo: "nlp-services"
+          git-branch: "master"
+          service-dir: "named-entity-recognition"
+          mainnet-port: "9993"
+          testnet-port: "9994"
+          run-command: "python3 run_service.py --ssl --metering"
+          test-command: "sleep 20;cd tests;pytest"
+          docker-test-files: "Dockerfile, requirements.txt"
+          docker-file-path: "named-entity-recognition/Dockerfile"
+          docker-no-cache: true
+          docker-image: "ci_tools_named_entity_recon"
+          docker-container: "CI_TOOLS_NAMED_ENTITY_RECON"
+          docker-nvidia: true
+          docker-volumes: "-v ~/singnet/.certs:/opt/singnet/.certs"
+          infura-api-key: ${INFURA_API_KEY}
+          daemon-version: ${CI_SNETD_VERSION}
+          daemon-pk: ${PK_NAMED_ENTITY_RECOGNITION}
+
+workflows:
+  deploy-services:
+    jobs:
+      - cntk-image-recon
+      - named-entity-recognition

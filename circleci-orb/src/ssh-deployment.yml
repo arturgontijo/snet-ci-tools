@@ -1,0 +1,365 @@
+version: 2.1
+
+commands:
+    deploy:
+        description: |
+            Deploying...
+        parameters:
+            ssh-user:
+                type: string
+            ssh-host:
+                type: string
+            git-user:
+                type: string
+                default: ${CIRCLE_PROJECT_USERNAME}
+            git-repo:
+                type: string
+                default: ${CIRCLE_PROJECT_REPONAME}
+            git-branch:
+                type: string
+                default: ${CIRCLE_BRANCH}
+            service-dir:
+                type: string
+                default: "."
+            mainnet-port:
+                type: string
+            testnet-port:
+                type: string
+                default: ""
+            run-command:
+                type: string
+            test-command:
+                type: string
+            docker-test-files:
+                type: string
+                default: ""
+            docker-file-path:
+                type: string
+            docker-no-cache:
+                type: boolean
+                default: true
+            docker-image:
+                type: string
+            docker-container:
+                type: string
+            docker-nvidia:
+                type: boolean
+                default: false
+            docker-volumes:
+                type: string
+                default: ""
+            infura-api-key:
+                type: string
+                default: ""
+            daemon-version:
+                type: string
+                default: ""
+            daemon-pk:
+                type: string
+                default: ""
+        steps:
+            - run:
+                  name: Setting Up
+                  command: |-
+                      export SSH_USER=<< parameters.ssh-user >>
+                      export SSH_HOST=<< parameters.ssh-host >>
+                      export GIT_USER=<< parameters.git-user >>
+                      export GIT_REPO=<< parameters.git-repo >>
+                      export GIT_BRANCH=<< parameters.git-branch >>
+                      export DOCKER_CONTAINER=<< parameters.docker-container >>
+                      export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
+                      export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
+                      export SERVICE_DIR=<< parameters.service-dir >>
+                      export FILES_LIST="<<parameters.docker-test-files>>"
+                      echo "Setting Up..."
+                      git clone https://github.com/singnet/snet-ci-tools.git /tmp/snet-ci-tools
+                      if [ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_PROJECT_REPONAME}"/"${CIRCLE_BRANCH}" != "${GIT_USER}"/"${GIT_REPO}"/"${GIT_BRANCH}" ]; then
+                        git clone -b "${GIT_BRANCH}" https://github.com/"${GIT_USER}"/"${GIT_REPO}".git /tmp/"${GIT_REPO}"
+                        export SERVICE_DIR=/tmp/"${GIT_REPO}"/"${SERVICE_DIR}"
+                      fi
+                      echo $(/tmp/snet-ci-tools/scripts/check_files.sh "${FILES_LIST}") >> /tmp/docker_rebuild
+                      echo "FILES_CHANGED=$(cat /tmp/docker_rebuild)"
+
+            - run:
+                  name: Removing old Docker Container (Previous Builds)
+                  command: |-
+                      export SSH_USER=<< parameters.ssh-user >>
+                      export SSH_HOST=<< parameters.ssh-host >>
+                      export GIT_USER=<< parameters.git-user >>
+                      export GIT_REPO=<< parameters.git-repo >>
+                      export GIT_BRANCH=<< parameters.git-branch >>
+                      export DOCKER_CONTAINER=<< parameters.docker-container >>
+                      export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
+                      export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
+                      echo "Removing old Container (from previous builds)..."
+                      ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} \<<- EOF
+                        docker stop ${PROD_TAG}${DOCKER_CONTAINER}_old || true
+                        docker rm ${PROD_TAG}${DOCKER_CONTAINER}_old || true
+                      EOF
+
+            - run:
+                  name: Building
+                  command: |-
+                      echo "=========================================== Build Configs ==========================================="
+                      export SSH_USER=<< parameters.ssh-user >>
+                      export SSH_HOST=<< parameters.ssh-host >>
+                      export GIT_USER=<< parameters.git-user >>
+                      export GIT_REPO=<< parameters.git-repo >>
+                      export GIT_BRANCH=<< parameters.git-branch >>
+                      export SNETD_VERSION=<< parameters.daemon-version >>
+                      export DOCKER_FILE_PATH=<< parameters.docker-file-path >>
+                      export DOCKER_FILE_URL=https://raw.githubusercontent.com/${GIT_USER}/${GIT_REPO}/${GIT_BRANCH}/${DOCKER_FILE_PATH}
+                      export DOCKER_NOCACHE=<< parameters.docker-no-cache >>
+                      export DOCKER_IMAGE=<< parameters.docker-image >>
+                      export DOCKER_CONTAINER=<< parameters.docker-container >>
+                      export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
+                      export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
+                      echo            git_user  : ${GIT_USER}
+                      echo            git_repo  : ${GIT_REPO}
+                      echo            git_branch: ${GIT_BRANCH}
+                      echo SSH_USER             : ${SSH_USER}
+                      echo SSH_HOST             : ${SSH_HOST}
+                      echo SNETD_VERSION        : ${SNETD_VERSION}
+                      echo DOCKER_NOCACHE       : ${DOCKER_NOCACHE}
+                      echo DOCKER_IMAGE         : ${DOCKER_IMAGE}
+                      echo DOCKER_CONTAINER     : ${DOCKER_CONTAINER}
+                      echo DOCKER_FILE_URL      : ${DOCKER_FILE_URL}
+                      echo "====================================================================================================="
+                      DOCKER_IMAGE_EXISTS=`ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} docker images -q ${DOCKER_IMAGE}:${CIRCLE_PROJECT_USERNAME}`
+                      FILES_CHANGED=`cat /tmp/docker_rebuild`
+                      echo DOCKER_IMAGE_EXISTS=${DOCKER_IMAGE_EXISTS}
+                      echo FILES_CHANGED=${FILES_CHANGED}
+                      ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} \<<- EOF
+                        if [ "$DOCKER_IMAGE_EXISTS" = "" ] || [ "$FILES_CHANGED" != 0 ]; then
+                            echo "Building..."
+                            docker build \
+                            --build-arg git_owner=${GIT_USER} \
+                            --build-arg git_repo=${GIT_REPO} \
+                            --build-arg git_branch=${GIT_BRANCH} \
+                            $([ "${SNETD_VERSION}" ] && echo "--build-arg snetd_version=${SNETD_VERSION}" || echo "") \
+                            $([ "${DOCKER_NOCACHE}" = "true" ] && echo "--no-cache" || echo "") \
+                            -t ${DOCKER_IMAGE}:${CIRCLE_PROJECT_USERNAME} ${DOCKER_FILE_URL}
+                        else
+                            echo "Not Building..."
+                        fi
+                      EOF
+
+            - run:
+                  name: Running new Docker Container
+                  command: |-
+                      echo "============================================ Run Configs ============================================"
+                      export SSH_USER=<< parameters.ssh-user >>
+                      export SSH_HOST=<< parameters.ssh-host >>
+                      export GIT_USER=<< parameters.git-user >>
+                      export GIT_REPO=<< parameters.git-repo >>
+                      export GIT_BRANCH=<< parameters.git-branch >>
+                      export INFURA_API_KEY=<< parameters.infura-api-key >>
+                      export PVT_KEY_FOR_METERING=<< parameters.daemon-pk >>
+                      export DOCKER_NVIDIA=<< parameters.docker-nvidia >>
+                      export DOCKER_IMAGE=<< parameters.docker-image >>
+                      export DOCKER_CONTAINER=<< parameters.docker-container >>
+                      export MAINNET_PORT=<< parameters.mainnet-port >>
+                      export TESTNET_PORT=<< parameters.testnet-port >>
+                      export DOCKER_VOLUMES="<< parameters.docker-volumes >>"
+                      export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
+                      export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
+                      export SERVICE_RUN_COMMAND="<< parameters.run-command >>"
+                      echo        git_user  : ${GIT_USER}
+                      echo        git_repo  : ${GIT_REPO}
+                      echo        git_branch: ${GIT_BRANCH}
+                      echo SSH_USER         : ${SSH_USER}
+                      echo SSH_HOST         : ${SSH_HOST}
+                      echo DOCKER_NOCACHE   : ${DOCKER_NOCACHE}
+                      echo DOCKER_NVIDIA    : ${DOCKER_NVIDIA}
+                      echo DOCKER_IMAGE     : ${DOCKER_IMAGE}
+                      echo DOCKER_CONTAINER : ${DOCKER_CONTAINER}
+                      echo MAINNET_PORT     : ${MAINNET_PORT}
+                      echo TESTNET_PORT     : ${TESTNET_PORT}
+                      echo DOCKER_VOLUMES   : ${DOCKER_VOLUMES}
+                      echo "====================================================================================================="
+                      echo "Running new Container..."
+                      ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} \<<- EOF
+                        docker stop ${PROD_TAG}${DOCKER_CONTAINER} || true
+                        docker rename ${PROD_TAG}${DOCKER_CONTAINER} ${PROD_TAG}${DOCKER_CONTAINER}_old || true
+                        docker run \
+                        $([ "${DOCKER_NVIDIA}" = "true" ] && echo "--runtime=nvidia" || echo "") \
+                        --name ${PROD_TAG}${DOCKER_CONTAINER} \
+                        --restart unless-stopped \
+                        -e INFURA_API_KEY=${INFURA_API_KEY} \
+                        -e PVT_KEY_FOR_METERING=${PVT_KEY_FOR_METERING} \
+                        $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${MAINNET_PORT}:${MAINNET_PORT}" || echo "") \
+                        $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${TESTNET_PORT}:${TESTNET_PORT}" || echo "") \
+                        << parameters.docker-volumes >> \
+                        -tdi ${DOCKER_IMAGE}:${CIRCLE_PROJECT_USERNAME} \
+                        bash -c "git fetch;git checkout ${GIT_BRANCH};git pull;sh buildproto.sh;${SERVICE_RUN_COMMAND}"
+                      EOF
+
+            - run:
+                  name: Checking SNET Daemon version
+                  command: |-
+                      echo "========================================= Daemon Version ============================================"
+                      export SSH_USER=<< parameters.ssh-user >>
+                      export SSH_HOST=<< parameters.ssh-host >>
+                      export DOCKER_CONTAINER=<< parameters.docker-container >>
+                      export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
+                      export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
+                      export SNETD_VERSION=<< parameters.daemon-version >>
+                      echo SSH_USER        : ${SSH_USER}
+                      echo SSH_HOST        : ${SSH_HOST}
+                      echo DOCKER_CONTAINER: ${PROD_TAG}${DOCKER_CONTAINER}
+                      echo SNETD_VERSION   : ${SNETD_VERSION}
+                      echo "====================================================================================================="
+                      echo "Checking SNET Daemon version..."
+                      RESTART_CONTAINER=$(/tmp/snet-ci-tools/scripts/check_daemon.sh "${SNETD_VERSION}")
+                      if [ "$RESTART_CONTAINER" != 0 ]; then
+                        echo "SNET Daemon updated, restarting the container..."
+                        ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} docker restart ${PROD_TAG}${DOCKER_CONTAINER}
+                      else
+                        echo "Not updating..."
+                      fi
+
+            - run:
+                name: Testing local
+                no_output_timeout: 60m
+                command: |-
+                    export SSH_USER=<< parameters.ssh-user >>
+                    export SSH_HOST=<< parameters.ssh-host >>
+                    export DOCKER_CONTAINER=<< parameters.docker-container >>
+                    export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
+                    export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
+                    export SERVICE_TEST_COMMAND="<< parameters.test-command >>"
+                    ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} \<<- EOF
+                      docker exec -i ${PROD_TAG}${DOCKER_CONTAINER} bash -c "${SERVICE_TEST_COMMAND}"
+                    EOF
+
+description: |
+    Orb to build and deploy a Docker container on a remote server using SSH.
+display:
+    home_url: https://github.com/singnet
+    source_url: https://github.com/singnet/snet-ci-tools
+examples:
+    deploy_application:
+        description: |
+            Example of using the orb.
+        usage:
+            orbs:
+                ssh-deployment: singularitynet/ssh-deployment@1.2.0
+            version: 2.1
+            workflows:
+                deploy_application:
+                    jobs:
+                        - ssh-deployment/deploy:
+                              ssh-host: "localhost"
+                              ssh-user: "ubuntu"
+                              git-user: "singnet"
+                              git-repo: "example-service"
+                              git-branch: "master"
+                              mainnet-port: "7000"
+                              run-command: "python3 run_example_service.py"
+                              test-command: "python3 test_example_service.py"
+                              docker-test-files: "Dockerfile, requirements.txt"
+                              docker-file-path: "Dockerfile"
+                              docker-image: "EXAMPLE_IMAGE_NAME"
+                              docker-container: "EXAMPLE_CONTAINER_NAME"
+
+jobs:
+    deploy:
+        description: Deploy a Docker image from a Github repository on a remote server using SSH.
+        docker:
+            - image: circleci/python:3.6.6-node
+        parameters:
+            ssh-user:
+                description: The remote SSH username.
+                type: string
+            ssh-host:
+                description: The remote SSH host.
+                type: string
+            git-user:
+                description: The Github user name.
+                type: string
+                default: ${CIRCLE_PROJECT_USERNAME}
+            git-repo:
+                description: The Github repository name.
+                type: string
+                default: ${CIRCLE_PROJECT_REPONAME}
+            git-branch:
+                description: The Github branch name.
+                type: string
+                default: ${CIRCLE_BRANCH}
+            service-dir:
+                description: The service directory.
+                type: string
+                default: "."
+            mainnet-port:
+                description: The service post (Mainnet).
+                type: string
+            testnet-port:
+                description: The service post (Testnet).
+                type: string
+                default: ""
+            run-command:
+                description: The service run command.
+                type: string
+            test-command:
+                description: The service test command.
+                type: string
+            docker-test-files:
+                description: The path(s) of files that will be tested before build the Docker image.
+                type: string
+                default: ""
+            docker-file-path:
+                description: The path to the Dockerfile inside the repository.
+                type: string
+            docker-no-cache:
+                description: The build the Docker image without cache.
+                type: boolean
+                default: false
+            docker-image:
+                description: The name of the Docker images that will be built.
+                type: string
+            docker-container:
+                description: The name of the Docker container that will be started.
+                type: string
+            docker-nvidia:
+                description: Starts the container with "--runtime=nvidia".
+                type: boolean
+                default: false
+            docker-volumes:
+                description: Starts the container with volumes mapping (-v).
+                type: string
+                default: ""
+            infura-api-key:
+                description: The key to access Infura API.
+                type: string
+                default: ""
+            daemon-version:
+                description: The Daemon version.
+                type: string
+                default: ""
+            daemon-pk:
+                description: The private key of Daemon post to metering server.
+                type: string
+                default: ""
+        steps:
+            - checkout
+            - deploy:
+                  ssh-user: << parameters.ssh-user >>
+                  ssh-host: << parameters.ssh-host >>
+                  git-user: << parameters.git-user >>
+                  git-repo: << parameters.git-repo >>
+                  git-branch: << parameters.git-branch >>
+                  service-dir: << parameters.service-dir >>
+                  mainnet-port: << parameters.mainnet-port >>
+                  testnet-port: << parameters.testnet-port >>
+                  run-command: << parameters.run-command >>
+                  test-command: << parameters.test-command >>
+                  docker-test-files: << parameters.docker-test-files >>
+                  docker-file-path: << parameters.docker-file-path >>
+                  docker-no-cache: << parameters.docker-no-cache >>
+                  docker-image: << parameters.docker-image >>
+                  docker-container: << parameters.docker-container >>
+                  docker-nvidia: << parameters.docker-nvidia >>
+                  docker-volumes: << parameters.docker-volumes >>
+                  infura-api-key: << parameters.infura-api-key >>
+                  daemon-version: << parameters.daemon-version >>
+                  daemon-pk: << parameters.daemon-pk >>
