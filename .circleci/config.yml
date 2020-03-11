@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-    ssh-deployment: singularity/ssh-deployment@1.2.0
+    ssh-deployment: singularitynet/ssh-deployment@1.2.0
 
 jobs:
   cntk-image-recon:
