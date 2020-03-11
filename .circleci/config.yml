@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-    ssh-deployment: singularitynet/ssh-deployment@2.1.0
+    ssh-deployment: singularitynet/ssh-deployment@2.2.0
 
 jobs:
   cntk-image-recon:
@@ -60,16 +60,16 @@ jobs:
     docker:
       - image: circleci/python:3.6.6-node
     steps:
-      - ssh-deployment/test:
-          ssh-host: ${SSH_HOST}
-          ssh-user: ${SSH_USER}
-          test-command: "sleep 20;source '/cntk/activate-cntk';python3 test_image_recon_service.py auto"
-          docker-container: "CI_TOOLS_IMAGE_RECON"
-      - ssh-deployment/test:
-          ssh-host: ${SSH_HOST}
-          ssh-user: ${SSH_USER}
-          test-command: "sleep 20;cd tests;pytest"
-          docker-container: "CI_TOOLS_NAMED_ENTITY_RECON"
+        - ssh-deployment/test:
+              ssh-host: ${SSH_HOST}
+              ssh-user: ${SSH_USER}
+              test-command: "sleep 20;source '/cntk/activate-cntk';python3 test_image_recon_service.py auto"
+              docker-container: "CI_TOOLS_IMAGE_RECON"
+        - ssh-deployment/test:
+              ssh-host: ${SSH_HOST}
+              ssh-user: ${SSH_USER}
+              test-command: "sleep 20;cd tests;pytest"
+              docker-container: "CI_TOOLS_NAMED_ENTITY_RECON"
 
 workflows:
   deploy-services:

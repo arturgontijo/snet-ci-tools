@@ -230,7 +230,7 @@ commands:
                 type: string
         steps:
             - run:
-                name: Testing local
+                name: Testing << parameters.docker-container >>
                 no_output_timeout: 60m
                 command: |-
                     export SSH_USER=<< parameters.ssh-user >>
@@ -254,7 +254,7 @@ examples:
             Example of using the orb.
         usage:
             orbs:
-                ssh-deployment: singularitynet/ssh-deployment@2.1.0
+                ssh-deployment: singularitynet/ssh-deployment@2.2.0
             version: 2.1
             workflows:
                 deploy_application:
