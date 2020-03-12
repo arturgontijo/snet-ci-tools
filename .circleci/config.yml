@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-    ssh-deployment: singularitynet/ssh-deployment@2.2.0
+    ssh-deployment: singularitynet/ssh-deployment@2.3.0
 
 jobs:
   cntk-image-recon:
@@ -25,6 +25,7 @@ jobs:
           docker-image: "ci_tools_image_recon"
           docker-container: "CI_TOOLS_IMAGE_RECON"
           docker-nvidia: true
+          docker-env-vars: "-e CI_EXTRA_ENV_VAR1=${CI_EXTRA_ENV_VAR1} -e CI_EXTRA_ENV_VAR2=${CI_EXTRA_ENV_VAR2}"
           docker-volumes: "-v ~/singnet/.certs:/opt/singnet/.certs"
           infura-api-key: ${INFURA_API_KEY}
           daemon-version: ${CI_SNETD_VERSION}

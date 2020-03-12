@@ -43,6 +43,9 @@ commands:
             docker-nvidia:
                 type: boolean
                 default: false
+            docker-env-vars:
+                type: string
+                default: ""
             docker-volumes:
                 type: string
                 default: ""
@@ -185,6 +188,7 @@ commands:
                         --restart unless-stopped \
                         -e INFURA_API_KEY=${INFURA_API_KEY} \
                         -e PVT_KEY_FOR_METERING=${PVT_KEY_FOR_METERING} \
+                        << parameters.docker-env-vars >> \
                         $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${MAINNET_PORT}:${MAINNET_PORT}" || echo "") \
                         $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${TESTNET_PORT}:${TESTNET_PORT}" || echo "") \
                         << parameters.docker-volumes >> \
@@ -254,7 +258,7 @@ examples:
             Example of using the orb.
         usage:
             orbs:
-                ssh-deployment: singularitynet/ssh-deployment@2.2.0
+                ssh-deployment: singularitynet/ssh-deployment@2.3.0
             version: 2.1
             workflows:
                 deploy_application:
@@ -336,6 +340,10 @@ jobs:
                 description: Starts the container with "--runtime=nvidia".
                 type: boolean
                 default: false
+            docker-env-vars:
+                description: Starts the container with environment variables.
+                type: string
+                default: ""
             docker-volumes:
                 description: Starts the container with volumes mapping (-v).
                 type: string
@@ -370,6 +378,7 @@ jobs:
                   docker-image: << parameters.docker-image >>
                   docker-container: << parameters.docker-container >>
                   docker-nvidia: << parameters.docker-nvidia >>
+                  docker-env-vars: << parameters.docker-env-vars >>
                   docker-volumes: << parameters.docker-volumes >>
                   infura-api-key: << parameters.infura-api-key >>
                   daemon-version: << parameters.daemon-version >>
