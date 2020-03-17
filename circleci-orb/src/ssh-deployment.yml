@@ -46,6 +46,9 @@ commands:
             docker-env-vars:
                 type: string
                 default: ""
+            docker-network:
+                type: string
+                default: ""
             docker-volumes:
                 type: string
                 default: ""
@@ -161,6 +164,7 @@ commands:
                       export DOCKER_CONTAINER=<< parameters.docker-container >>
                       export MAINNET_PORT=<< parameters.mainnet-port >>
                       export TESTNET_PORT=<< parameters.testnet-port >>
+                      export DOCKER_NETWORK="<< parameters.docker-network >>"
                       export DOCKER_VOLUMES="<< parameters.docker-volumes >>"
                       export DOCKER_DEPLOY=$([ "${CIRCLE_PROJECT_USERNAME}"/"${CIRCLE_BRANCH}" = "singnet/master" ] && echo "true" || echo "false")
                       export PROD_TAG=$([ "${DOCKER_DEPLOY}" = "true" ] && echo "PROD_" || echo "")
@@ -176,10 +180,15 @@ commands:
                       echo DOCKER_CONTAINER : ${DOCKER_CONTAINER}
                       echo MAINNET_PORT     : ${MAINNET_PORT}
                       echo TESTNET_PORT     : ${TESTNET_PORT}
+                      echo DOCKER_NETWORK   : ${DOCKER_NETWORK}
                       echo DOCKER_VOLUMES   : ${DOCKER_VOLUMES}
                       echo "====================================================================================================="
                       echo "Running new Container..."
                       ssh -o "StrictHostKeyChecking no" ${SSH_USER}@${SSH_HOST} \<<- EOF
+                        if [ "${DOCKER_NETWORK}" != "" ]; then
+                            docker network rm ${DOCKER_NETWORK} || true
+                            docker network create ${DOCKER_NETWORK}
+                        fi
                         docker stop ${PROD_TAG}${DOCKER_CONTAINER} || true
                         docker rename ${PROD_TAG}${DOCKER_CONTAINER} ${PROD_TAG}${DOCKER_CONTAINER}_old || true
                         docker run \
@@ -191,6 +200,7 @@ commands:
                         << parameters.docker-env-vars >> \
                         $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${MAINNET_PORT}:${MAINNET_PORT}" || echo "") \
                         $([ "${DOCKER_DEPLOY}" = "true" ] && echo "-p ${TESTNET_PORT}:${TESTNET_PORT}" || echo "") \
+                        $([ "${DOCKER_NETWORK}" != "" ] && echo "--network ${DOCKER_NETWORK}" || echo "") \
                         << parameters.docker-volumes >> \
                         -tdi ${DOCKER_IMAGE}:${CIRCLE_PROJECT_USERNAME} \
                         bash -c "git fetch;git checkout ${GIT_BRANCH};git pull;sh buildproto.sh;${SERVICE_RUN_COMMAND}"
@@ -258,7 +268,7 @@ examples:
             Example of using the orb.
         usage:
             orbs:
-                ssh-deployment: singularitynet/ssh-deployment@2.3.0
+                ssh-deployment: singularitynet/ssh-deployment@2.4.1
             version: 2.1
             workflows:
                 deploy_application:
@@ -344,6 +354,10 @@ jobs:
                 description: Starts the container with environment variables.
                 type: string
                 default: ""
+            docker-network:
+                description: Starts the container with an specific network (--network).
+                type: string
+                default: ""
             docker-volumes:
                 description: Starts the container with volumes mapping (-v).
                 type: string
@@ -379,6 +393,7 @@ jobs:
                   docker-container: << parameters.docker-container >>
                   docker-nvidia: << parameters.docker-nvidia >>
                   docker-env-vars: << parameters.docker-env-vars >>
+                  docker-network: << parameters.docker-network >>
                   docker-volumes: << parameters.docker-volumes >>
                   infura-api-key: << parameters.infura-api-key >>
                   daemon-version: << parameters.daemon-version >>
